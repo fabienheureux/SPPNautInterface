@@ -1,3 +1,4 @@
+import requests
 from django.core import serializers
 from django.http import Http404, HttpRequest, HttpResponse
 from django.shortcuts import redirect, render
@@ -70,3 +71,19 @@ def index(request: HttpRequest) -> HttpResponse:
             "search": search,
         },
     )
+
+
+# FIXME: Vérifier si indispensable, le chargement direct du WMS
+# génère des pb de CORS Policy lors du GetFeatureInfo
+@require_GET
+def wms_proxy(request):
+    response = requests.get(
+        url="https://services.data.shom.fr/INSPIRE/wms/v",
+        params=({**request.GET.dict(), "version": "1.3.0"}),
+    )
+    http_response = HttpResponse(response)
+    headers_to_forward = ["Content-Type", "Content-Length"]
+    for header in headers_to_forward:
+        if header in response.headers:
+            http_response.headers[header] = response.headers[header]
+    return http_response
