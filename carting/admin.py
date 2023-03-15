@@ -6,7 +6,7 @@ from django.urls import reverse
 from django.utils.html import format_html_join
 from tree_queries.models import TreeNode
 
-from .models import OuvrageSection
+from .models import BDGS, OuvrageSection
 from .widgets import CustomOSMWidget
 
 logger = logging.getLogger(__name__)
@@ -37,10 +37,6 @@ def children(instance: TreeNode):
 @admin.register(OuvrageSection)
 class OuvrageSectionAdmin(GISModelAdmin):
     gis_widget = CustomOSMWidget
-    ordering = ("numero",)
-    list_display = ("__str__", "bpn_id", "ouvrage_name")
-    list_filter = (("geometry", admin.EmptyFieldListFilter),)
-    search_fields = ("bpn_id", "numero", "content")
 
     readonly_fields = (
         "bpn_id",
@@ -49,14 +45,42 @@ class OuvrageSectionAdmin(GISModelAdmin):
         children,
         "parent",
     )
+
     fields = (
+        "bdgs_object",
+        "content",
         "numero",
         "bpn_id",
         "parent",
         children,
         "geometry",
-        "content",
     )
+
+    raw_id_fields = ("bdgs_object",)
+    ordering = ("numero",)
+    list_display = ("__str__", "bpn_id", "ouvrage_name")
+    list_filter = (
+        ("geometry", admin.EmptyFieldListFilter),
+        ("bdgs_object", admin.EmptyFieldListFilter),
+        "typology",
+    )
+    search_fields = ("bpn_id", "numero", "content")
+    change_form_template = "widgets/text_with_map.html"
+
+    def has_add_permission(self, request, obj=None):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+
+
+@admin.register(BDGS)
+class BDGSAdmin(GISModelAdmin):
+    gis_widget = CustomOSMWidget
+    list_display = ("inspire_id", "category")
+    search_fields = ("inspire_id", "category")
+
+    readonly_fields = ("inspire_id", "category", "raw", "geometry")
 
     def has_add_permission(self, request, obj=None):
         return False
