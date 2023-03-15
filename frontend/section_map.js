@@ -27,6 +27,8 @@ export class SectionMap {
     #map
     #geojsonLayer
     #selectInteraction
+    #source
+    #wms_popin
 
     #maxZoom
     #padding = [20, 20, 20, 20]
@@ -49,6 +51,55 @@ export class SectionMap {
         this.#map = this.#initMap(maxZoom, initialCenter, target, geojson)
         this.#initHoverInteraction()
         this.#selectInteraction = this.#initSelectInteraction()
+        this.#wms_popin = document.getElementById("wms_popin")
+        this.#wms_popin
+            .querySelector("button")
+            .addEventListener("click", this.#closeWMSPopin)
+        this.#map.on("click", this.#showWMSPopin)
+    }
+    #showWMSPopin = (mapBrowserEvent) => {
+        console.log(mapBrowserEvent)
+        if (!mapBrowserEvent.originalEvent.shiftKey) {
+            console.log("Pas de shift == pas de popin")
+            return
+        }
+
+        const jsonUrl = this.#source.getFeatureInfoUrl(
+            mapBrowserEvent.coordinate,
+            0.0002,
+            "EPSG:4326",
+            {
+                INFO_FORMAT: "application/json",
+            },
+        )
+
+        const htmlUrl = this.#source.getFeatureInfoUrl(
+            mapBrowserEvent.coordinate,
+            0.0002,
+            "EPSG:4326",
+            {
+                INFO_FORMAT: "text/html",
+            },
+        )
+
+        fetch(htmlUrl)
+            .then((response) => response.text())
+            .then((html) => {
+                this.#setWMSFeatureContent(html)
+            })
+    }
+
+    #setWMSFeatureContent(html) {
+        this.#wms_popin = document.getElementById("wms_popin")
+        console.log(html)
+        if (!html.includes("FR00")) {
+            return
+        }
+        this.#wms_popin.querySelector("div").innerHTML = html
+        this.#wms_popin.style.display = "flex"
+    }
+    #closeWMSPopin = () => {
+        this.#wms_popin.style.display = "none"
     }
 
     #initMap(maxZoom, initialCenter, target, geojson) {
@@ -91,10 +142,21 @@ export class SectionMap {
             })
         })
 
+        const LAYERS = "BALISAGE_BDD_WMSV"
+        this.#source = new TileWMS({
+            url: "/carting/proxy/wms",
+            params: { TILED: true, LAYERS },
+            serverType: "geoserver",
+        })
+        const WMSLayer = new TileLayer({
+            source: this.#source,
+            minZoom: 11,
+        })
+
         return new OLMap({
             target,
             view,
-            layers: [...rasterMarineLayers, this.#geojsonLayer],
+            layers: [...rasterMarineLayers, this.#geojsonLayer, WMSLayer],
         })
     }
 
@@ -116,7 +178,8 @@ export class SectionMap {
 
     #initHoverInteraction() {
         const hoverInteraction = new Select({
-            condition: pointerMove,
+            condition: (mapBrowserEvent) =>
+                pointerMove(mapBrowserEvent) && noModifierKeys(mapBrowserEvent),
             style: buildStyle({
                 strokeColor: this.#hoveredStrokeColor,
                 fillColor: this.#hoveredFillColor,
@@ -162,6 +225,7 @@ export class SectionMap {
         let bpnID = ""
         if (selectedFeature) {
             bpnID = selectedFeature.getId()
+            this.#closeWMSPopin()
         }
         this.#map.getTargetElement().dispatchEvent(
             new CustomEvent("ol:select", {

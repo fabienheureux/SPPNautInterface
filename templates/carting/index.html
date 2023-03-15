@@ -45,7 +45,11 @@
             >
             </div>
         </div>
-        <div class="fr-col-12 fr-col-md-5 fr-p-1w">
+        <div class="fr-col-12 fr-col-md-5 fr-p-1w" style="position: relative">
+            <div id="wms_popin" style="position: sticky; top:0; height: 100vh; display: none; background:white;z-index: 2; flex-direction: column;">
+                <button class="fr-btn fr-btn--tertiary-no-outline fr-icon-close-circle-fill">fermer</button>
+                <div style="overflow-y: auto; overscroll-behavior: contain;"></div>
+            </div>
             <form>
                 <div class="fr-search-bar" role="search">
                     <input
