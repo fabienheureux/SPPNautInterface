@@ -1,0 +1,149 @@
+{% extends "layout/base.html" %}
+
+{% load static %}
+{% load query_string %}
+
+{% block page_title %}Carting{% endblock%}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static "carting.css" %}">
+{% endblock %}
+
+{% block js %}
+<script type="module" src="{% static "carting.js" %}"></script>
+{% endblock %}
+
+{% block main %}
+<div class="fr-container">
+    <div class="fr-alert fr-alert--info fr-mt-2w fr-mb-1w">
+        <h3 class="fr-alert__title">Cette page est en construction, elle s'améliore grâce à vous.</h3>
+        <p>
+            Envoyez-nous vos idées et commentaires sur
+            <a href="mailto:equipe@sppnaut.beta.gouv.fr">
+                equipe@sppnaut.beta.gouv.fr
+            </a>.
+        <p>
+    </div>
+</div>
+
+<div
+    class="
+        fr-container--fluid
+        sn-snap-always sn-snap-start
+    "
+>
+    <div
+        data-controller="map"
+        data-map-wms-url-value="{% url 'carting:wms-proxy' %}"
+        data-map-bbox-value="{{ bbox }}"
+        data-action="
+            ol:select->map#selectSectionInText
+            ol:changed->map#updateBboxInUrl
+            wms:featureInfoFetched->map#showFeaturePopin
+            hashchange@window->map#selectSectionInMapFromHash
+            hashchange@window->map#closeFeaturePopin
+        "
+        class="fr-grid-row fr-m-1w"
+    >
+        <div class="fr-col-12 fr-col-md-7">
+            <div
+                id="map"
+                data-map-target="map"
+                class="
+                    sn-h-screen sn-w-full Zsn-sticky Zsn-top-0
+                    fr-p-1w
+                "
+            >
+            </div>
+        </div>
+        <div class="
+                sn-relative
+                fr-col-12 fr-col-md-5 fr-p-1w
+            "
+        >
+            <div
+                data-controller="popin"
+                data-map-target="featurePopin"
+                aria-hidden="true"
+                class="
+                    sn-flex aria-hidden:sn-hidden sn-sticky sn-top-0 sn-h-screen sn-flex-col sn-z-10
+                    fr-p-1w fr-background-default--grey
+                "
+            >
+                <button
+                    data-action="popin#close"
+                    class="fr-mb-1w fr-btn fr-btn--icon-right fr-btn--tertiary fr-icon-close-circle-fill"
+                >
+                    Fermer
+                </button>
+                <div
+                    data-popin-target="content"
+                    class="sn-overflow-y-auto sn-overscroll-contain"
+                ></div>
+            </div>
+            <turbo-frame
+                id="sections"
+                data-map-target="turboframe"
+                data-turbo-action="advance"
+                class="
+                    sn-block sn-h-screen sn-overflow-auto sn-overscroll-contain sn-px-1v sn-pb-1v
+                    aria-busy:sn-opacity-50 sn-transition-opacity sn-ease-in aria-busy:sn-delay-150
+                "
+            >
+                <a
+                    href="{% url "carting:geometry_first" %}"
+                    class="sn-fixed sn-left-0 sn-bottom-0 sn-bg-white"
+                >
+                    {% comment %} {{ zoom_level }} - {{ bbox }} {% endcomment %}
+                </a>
+                {% comment %} {{ sections.count }} {% endcomment %}
+                <script type="application/geojson" data-map-target="geojson">
+                    {{ geojson|safe }}
+                </script>
+                {% if request.GET.expanded %}
+                    <div class="sn-sticky sn-top-0 sn-bg-white sn-z-10">
+                        <a
+                            {% if expanded_section.pk == root_expanded %}
+                                href="{% query_string_without "root_expanded" "expanded" %}"
+                            {% else %}
+                                href="{% query_string_with expanded=expanded_section.parent.pk %}"
+                            {% endif %}
+                            class="fr-mb-1w fr-btn fr-btn--icon-left fr-btn--secondary fr-icon-arrow-left-line"
+                        >
+                            Retour
+                        </a>
+                    </div>
+                    {% if expanded_section %}
+                        {% include 'carting/cards/title.html' with section=expanded_section %}
+                    {% endif %}
+                    {% for section in expanded_section.children.all %}
+                        {% if section.typology == "ALINEA" %}
+                            {% ifchanged section.typology %}
+                                <div class="sn-m-2w">
+                            {% endifchanged %}
+
+                            {% include 'carting/cards/alinea.html' %}
+
+                            {% if forloop.last %}
+                                </div>
+                            {% endif %}
+                        {% else %}
+                            {% ifchanged section.typology %}
+                                {% if not forloop.first %}
+                                    </div>
+                                {% endif %}
+                            {% endifchanged %}
+
+                            {% include 'carting/cards/title.html' %}
+                        {% endif %}
+                    {% endfor %}
+                {% else %}
+                    {% for section in sections %}
+                        {% include 'carting/cards/title.html' %}
+                    {% endfor %}
+                {% endif %}
+            </turbo-frame>
+        </div>
+    </div>
+</div>
+{% endblock %}

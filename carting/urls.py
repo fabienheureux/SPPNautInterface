@@ -1,9 +1,12 @@
 from django.urls import path
+from django.views.generic import RedirectView
 
 from . import views
 
 urlpatterns = [
-    path("", views.index, name="index"),
+    path("", RedirectView.as_view(pattern_name="carting:geometry_first")),
+    path("text", views.text_first, name="text_first"),
+    path("geometry", views.geometry_first, name="geometry_first"),
     path(
         "proxy/wms",
         views.wms_proxy,
