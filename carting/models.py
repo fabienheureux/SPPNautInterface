@@ -11,6 +11,7 @@ from django.contrib.gis.db import models
 from django.db import DatabaseError
 from django.utils.safestring import mark_safe
 from tree_queries.models import TreeNode, TreeQuerySet
+from xmlschema import etree_tostring
 
 xslt_transform = ET.XSLT(ET.parse("carting/xslt/ouvrage_section_html.xslt"))
 
@@ -209,9 +210,66 @@ class OuvrageSection(TreeNode):
         ]
 
 
+from django.contrib.gis.geos import GEOSGeometry
+from lxml import etree
+
+
+def get_submember2(root):
+    member = root.find("member") or root.find("imember")
+    return member[0]
+
+
 class S1xyObject(models.Model):
     id = models.CharField(max_length=255, primary_key=True)
     typology = models.CharField(max_length=255)
     content = models.TextField(blank=True)
     geometry = models.GeometryField(blank=True, null=True, default=None, srid=4326)
     link_to = models.ManyToManyField("self", blank=True)
+
+    def _create_links(self):
+        for link_id in self._collect_link_ids():
+            (link_obj, _) = S1xyObject.objects.get_or_create(id=link_id)
+            self.link_to.add(link_obj)
+
+    def _get_submember(self):
+        root = etree.fromstring(self.content)
+        return get_submember2(root)
+
+    @classmethod
+    def inject_from_xml_str(cls, xml_str: str):
+        root = etree.fromstring(xml_str)
+        sub_member = get_submember2(root)
+        gml_id = sub_member.get("{" + sub_member.nsmap["gml"] + "}id")
+        typology = sub_member.prefix + ":" + etree.QName(sub_member).localname
+
+        geometry = None
+        geom = sub_member.find("geometry")
+        if geom is not None:
+            try:
+                geometry = GEOSGeometry.from_gml(
+                    etree.tostring(geom[0][0], method="xml", encoding="unicode")
+                )
+            except IndexError:
+                pass
+
+        (s1xy_object, _) = S1xyObject.objects.update_or_create(
+            id=gml_id,
+            defaults={
+                "typology": typology,
+                "content": xml_str,
+                "geometry": geometry,
+            },
+        )
+        s1xy_object._create_links()
+        return s1xy_object
+
+    def _collect_link_ids(self):
+        sub_member = self._get_submember()
+        to_link_list = []
+        for child in sub_member.findall(
+            ".//*[@{" + sub_member.nsmap["xlink"] + "}href]"
+        ):
+            child_href = child.get("{" + child.nsmap["xlink"] + "}href")
+            child_href = child_href.replace("#", "")
+            to_link_list.append(child_href)
+        return to_link_list
