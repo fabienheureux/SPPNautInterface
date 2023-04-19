@@ -8,10 +8,11 @@ from xml.etree import ElementTree
 
 import lxml.etree as ET
 from django.contrib.gis.db import models
+from django.contrib.gis.geos import GEOSGeometry
 from django.db import DatabaseError
 from django.utils.safestring import mark_safe
+from lxml import etree
 from tree_queries.models import TreeNode, TreeQuerySet
-from xmlschema import etree_tostring
 
 xslt_transform = ET.XSLT(ET.parse("carting/xslt/ouvrage_section_html.xslt"))
 
@@ -210,10 +211,6 @@ class OuvrageSection(TreeNode):
         ]
 
 
-from django.contrib.gis.geos import GEOSGeometry
-from lxml import etree
-
-
 def get_submember2(root):
     member = root.find("member") or root.find("imember")
     return member[0]
@@ -240,7 +237,9 @@ class S1xyObject(models.Model):
         root = etree.fromstring(xml_str)
         sub_member = get_submember2(root)
         gml_id = sub_member.get("{" + sub_member.nsmap["gml"] + "}id")
-        typology = sub_member.prefix + ":" + etree.QName(sub_member).localname
+        typology = (sub_member.prefix + ":" if sub_member.prefix else "") + etree.QName(
+            sub_member
+        ).localname
 
         geometry = None
         geom = sub_member.find("geometry")
@@ -265,6 +264,8 @@ class S1xyObject(models.Model):
 
     def _collect_link_ids(self):
         sub_member = self._get_submember()
+        if "xlink" not in sub_member.nsmap:
+            return []
         to_link_list = []
         for child in sub_member.findall(
             ".//*[@{" + sub_member.nsmap["xlink"] + "}href]"

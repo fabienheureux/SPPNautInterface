@@ -33,4 +33,5 @@ class Command(BaseCommand):
                 object_xml = etree.tostring(
                     object_content, method="xml", encoding="unicode"
                 )
+                print(object_xml)
                 S1xyObject.inject_from_xml_str(object_xml)
