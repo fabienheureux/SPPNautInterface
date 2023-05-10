@@ -1,6 +1,7 @@
 from django.contrib.contenttypes.fields import GenericForeignKey, GenericRelation
 from django.contrib.contenttypes.models import ContentType
 from django.contrib.gis.db import models
+from django.contrib.postgres.fields import ArrayField
 from django.core.exceptions import ValidationError
 from django.core.validators import MinValueValidator
 
@@ -234,4 +235,415 @@ class VesselsMeasurements(s100.models.ComplexAttributeType):
     )
     vessels_characteristics_unit = models.CharField(
         max_length=255, choices=VesselsCharacteristicsUnit.choices
+    )
+
+
+class CategoryOfCommPref(models.TextChoices):
+    # fmt: off
+    PREFERRED_CALLING = "preferred calling" # the first choice channel or frequency to be used when calling a radio station
+    ALTERNATE_CALLING = "alternate calling" # a channel or frequency to be used for calling a radio station when the preferred channel or frequency is busy or is suffering from interference
+    PREFERRED_WORKING = "preferred working" # the first choice channel or frequency to be used when working with a radio station
+    ALTERNATE_WORKING = "alternate working" # a channel or frequency to be used for working with a radio station when the preferred working channel or frequency is busy or is suffering from interference
+    # fmt: on
+
+
+# PDF page 26
+class ContactDetails(s100.models.InformationType):
+    """
+    Information on how to reach a person or organisation by postal, internet,
+    telephone, telex and radio systems.
+    """
+
+    """
+    :ivar online_resource: Information about online sources from which a resource or data can be obtained (ISO 19115, adapted)
+    :ivar telecommunications: information for contact by means of a
+        telecommunications service. Distinctions: emailAddress,
+        internetAddress, callName, callSign, COMCHA
+    :ivar radiocommunications: When bound to ContactDetails, only the
+        listed sub-attributes may be used: - communicationChannel -
+        contactinstructions - frequencypair -
+        categoryOfChannelOrFrequencyPreference -
+        timeIntervalsByDayOfWeek
+    :ivar the_authority:
+    """
+
+    call_name = models.CharField(
+        max_length=255,
+        blank=True,
+        null=True,
+        help_text="The designated call name of a station, e.g. radio station, radar station, pilot. Remarks: This is the name used when calling a radio station by radio i.e. 'Singapore Pilots'.",
+    )
+
+    call_sign = models.CharField(
+        max_length=255,
+        blank=True,
+        null=True,
+        help_text="The designated call-sign of a radio station.",
+    )
+
+    category_of_comm_pref = models.CharField(
+        max_length=255,
+        choices=CategoryOfCommPref.choices,
+        blank=True,
+        null=True,
+        # No description in XSD
+    )
+
+    communication_channel = ArrayField(
+        models.CharField(max_length=255),
+        default=list,
+        blank=True,
+        help_text="A channel number assigned to a specific radio frequency, frequencies or frequency band.<br/>"
+        "ℹ️ Write comma separated values to define multiple.",
+    )
+
+    contact_instructions = models.TextField(
+        blank=True,
+        null=True,
+        help_text="Supplemental instructions on how or when to contact the individual, organisation, or service",
+    )
+
+    information = GenericRelation(s100.models.Information)
+
+    language = models.CharField(
+        max_length=3,
+        choices=s100.models.ISO639_3.choices,
+        # No description in XSD
+    )
+
+    # FIXME : Series of 9 digits ? Do we validate that ?
+    mmsi_code = models.CharField(
+        max_length=255,
+        blank=True,
+        null=True,
+        help_text="The Maritime Mobile Service Identity (MMSI) Code is formed of a series of nine digits which are transmitted over the radio path in order to uniquely identify ship stations, ship earth stations, coast stations, coast earth stations, and group calls. These identities are formed in such a way that the identity or part thereof can be used by telephone and telex subscribers connected to the general telecommunications network principally to call ships automatically.",
+    )
+
+
+class ContactAddress(s100.models.ComplexAttributeType):
+    """
+    Direction or superscription of a letter, package, etc., specifying the name
+    of the place to which it is directed, and optionally a contact person or
+    organisation who should receive it.
+    """
+
+    contact_details = models.ForeignKey(
+        ContactDetails, on_delete=models.CASCADE, related_name="contact_addresses"
+    )
+
+    delivery_point = ArrayField(
+        models.CharField(max_length=255),
+        default=list,
+        blank=True,
+        help_text="Details of where post can be delivered such as the apartment, name and/or number of a street, building or PO Box.",
+    )
+    city_name = models.CharField(
+        max_length=255,
+        blank=True,
+        null=True,
+        help_text="The name of a town or city.",
+    )
+    administrative_division = models.CharField(
+        max_length=255,
+        blank=True,
+        null=True,
+        help_text="Administrative division is a generic term for an administrative region within a country at a level below that of the sovereign state.",
+    )
+    country_name = models.CharField(
+        max_length=255,
+        blank=True,
+        null=True,
+        help_text="The name of a nation. (Adapted from The American Heritage Dictionaries)",
+    )
+    postal_code = models.CharField(
+        max_length=255,
+        blank=True,
+        null=True,
+        help_text="Known in various countries as a postcode, or ZIP code, the postal code is a series of letters and/or digits that identifies each postal delivery area.",
+    )
+
+
+class FrequencyPair(s100.models.ComplexAttributeType):
+    """
+    A pair of frequencies for transmitting and receiving radio signals.
+    The shore station transmits and receives on the frequencies indicated
+    """
+
+    contact_details = models.ForeignKey(
+        ContactDetails, on_delete=models.CASCADE, related_name="frequency_pairs"
+    )
+    # FIXME : Format Validator : 6 digits mandatory for an Integer. CustomField with a format for the output, or force to string ?
+    # https://docs.djangoproject.com/en/4.2/ref/models/fields/#django.db.models.Field.from_db_value
+    frequency_shore_station_transmits = ArrayField(
+        models.PositiveIntegerField(),
+        default=list,
+        blank=True,
+        help_text="The shore station transmitter frequency expressed in kHz to one decimal place. Units: kHZ, Resolution: 0.1, Format: XXXXXX Examples: 4379.1 kHz becomes 043791; 13162.8 kHz becomes 131628",
+    )
+    # FIXME : Format Validator : 6 digits mandatory for an Integer. CustomField with a format for the output ?
+    # https://docs.djangoproject.com/en/4.2/ref/models/fields/#django.db.models.Field.from_db_value
+    frequency_shore_station_receives = ArrayField(
+        models.PositiveIntegerField(),
+        default=list,
+        blank=True,
+        help_text="The shore station receiver frequency expressed in kHz to one decimal place. Units: kHz, Resolution: 0.1, Format: XXXXXX Examples: 4379.1 kHz becomes 043791; 13162.8 kHz becomes 131628",
+    )
+    # FIXME : Why an array ? This is already a TextField. And the parent class has already the exact same attribute...
+    contact_instructions = ArrayField(
+        models.TextField(),
+        default=list,
+        blank=True,
+        # No description in XSD
+    )
+
+
+# FIXME : do we put this class in shared ?
+class OnlineResource(s100.models.ComplexAttributeType):
+    """
+    Information about online sources from which a resource or data can be
+    obtained (ISO 19115, adapted).
+    """
+
+    class OnlineFunction(s100.models.CodeList):
+        # fmt: off
+        DOWNLOAD = "download" # Online instructions for transferring data from one storage device or system to another.
+        INFORMATION = "information" # Online information about the resource.
+        OFFLINE_ACCESS = "offline access" # Online instructions for requesting the resource from the provider.
+        ORDER = "order" # Online order process for obtaining the resource.
+        SEARCH = "search" # Online search interface for seeking out information about the resource.
+        COMPLETE_METADATA = "complete metadata" # Complete metadata provided.
+        BROWSE_GRAPHIC = "browse graphic" # Browse graphic provided.
+        UPLOAD = "upload" # Resource upload capability provided.
+        EMAIL_SERVICE = "email service" # Online email service provided.
+        BROWSING = "browsing" # Online browsing provided.
+        FILE_ACCESS = "file access" # Online file access provided.
+        # fmt: on
+
+    contact_details = models.ForeignKey(
+        ContactDetails, on_delete=models.CASCADE, related_name="online_resources"
+    )
+
+    linkage = models.URLField(
+        help_text="Location (address) for on-line access using a URL/URI address or similar addressing scheme. (Adapted from ISO 19115:2014.)",
+    )
+
+    protocol = models.CharField(
+        max_length=255,
+        blank=True,
+        null=True,
+        help_text="Connection protocol to be used. Example: ftp, http get KVP, http POST, etc. (ISO 19115)",
+    )
+
+    application_profile = models.CharField(
+        max_length=255,
+        blank=True,
+        null=True,
+        help_text="Name of an application profile that can be used with the online resource (ISO 19115)",
+    )
+
+    name_of_resource = models.CharField(
+        max_length=255,
+        blank=True,
+        null=True,
+        help_text="Name of the online resource (ISO 19115, adapted)",
+    )
+
+    online_resource_description = models.CharField(
+        max_length=255,
+        blank=True,
+        null=True,
+        help_text="Detailed text description of what the online resource is/does (ISO 19115)",
+    )
+
+    online_function = models.CharField(
+        max_length=255,
+        choices=OnlineFunction.choices,
+        blank=True,
+        null=True,
+        help_text="Code for function performed by the online resource (ISO 19115)",
+    )
+
+    protocol_request = models.CharField(
+        max_length=255,
+        blank=True,
+        null=True,
+        help_text="Request used to access the resource. Structure and content depend on the protocol and standard used by the online resource, such as Web Feature Service standard. (ISO 19115, adapted)",
+    )
+
+
+class Radiocommunications(s100.models.ComplexAttributeType):
+    """
+    Detailed radiocommunications description with channels, frequencies,
+    preferences and time schedules.
+    """
+
+    class CategoryOfMaritimeBroadcast(models.TextChoices):
+        # fmt: off
+        NAVIGATIONAL_WARNING = "navigational warning" # message containing urgent information relevant to safe navigation broadcast to ships in accordance with the provisions of the International Convention for the Safety of Life at Sea, 1974, as amended
+        METEOROLOGICAL_WARNING = "meteorological warning" # warning of adverse weather conditions
+        ICE_REPORT = "ice report" # report of the ice situation and restrictions to shipping
+        SAR_INFORMATION = "SAR information" # broadcast message with information about an ongoing SAR operation
+        PIRATE_ATTACK_WARNING = "pirate attack warning" # warning of possible attack by pirates
+        METEOROLOGICAL_FORECAST = "meteorological forecast" # broadcast message containing meteorological forecast
+        PILOT_SERVICE_MESSAGE = "pilot service message" # broadcast message about pilot service
+        AIS_INFORMATION = "AIS information" # broadcast message about AIS information
+        LORAN_MESSAGE = "LORAN message" # broadcast message about the LORAN service
+        SATNAV_MESSAGE = "SATNAV message" # broadcast message about Satellite Navigation service
+        GALE_WARNING = "gale warning" # warning of winds of Beaufort force 8 or 9
+        STORM_WARNING = "storm warning" # warning of winds of Beaufort force 10 or over
+        TROPICAL_REVOLVING_STORM_WARNING = "tropical revolving storm warning" # warning of hurricanes in the North Atlantic and eastern North Pacific, typhoons in the Western Pacific, cyclones in the Indian Ocean and cyclones of similar nature in other regions
+        NAVAREA_WARNING = "NAVAREA warning" # navigational warning or in-force bulletin promulgated as part of a numbered series by a NAVAREA coordinator (Maritime Safety Information Manual 2009)
+        COASTAL_WARNING = "coastal warning" # navigational warning promulgated as part of a numbered series by a National coordinator (Maritime Safety Information Manual 2009)
+        LOCAL_WARNING = "local warning" # warning which covers inshore waters, often within the limits of jurisdiction of a harbour or port authority (Maritime Safety Information Manual 2009)
+        LOW_WATER_LEVEL_WARNING_NEGATIVE_TIDAL_SURGE = "low water level warning/negative tidal surge" # warning of actual or expected low water level
+        ICING_WARNING = "icing warning" # warning of accretion of ice on ships
+        TSUNAMI_BROADCAST = "tsunami broadcast" # broadcasts about tsunamis, including watches, advisories, and other types of messages relating to tsunamis or potential tsunamis
+        # fmt: on
+
+    class CategoryOfRadioMethods(models.TextChoices):
+        # fmt: off
+        LOW_FREQUENCY_LF_VOICE_TRAFFIC = "Low Frequency (LF) voice traffic" # Frequency in a frequency range between 30 and 300 kHz used for voice traffic
+        MEDIUM_FREQUENCY_MF_VOICE_TRAFFIC = "Medium Frequency (MF) voice traffic" # Frequency in a frequency range between 300 and 3 000kHz used for voice traffic
+        HIGH_FREQUENCY_HF_VOICE_TRAFFIC = "High Frequency (HF) voice traffic" # Frequency in a frequency range between 3 and 30 MHz used for voice traffic
+        VERY_HIGH_FREQUENCY_VHF_VOICE_TRAFFIC = "Very High Frequency (VHF) voice traffic" # Frequency in a frequency range between 30 and 300 MHz used for voice traffic
+        HIGH_FREQUENCY_NARROW_BAND_DIRECT_PRINTING = "High Frequency Narrow Band Direct Printing" # High Frequency Narrow Band Direct Printing
+        NAVTEX = "NAVTEX" # Narrow-band direct-printing telegraphy system for transmission of maritime safety information.
+        SAFETY_NET = "SafetyNET" # SafetyNET is an international automatic direct- printing satellite-based service for the promulgation of navigational and meteorological warnings, meteorological forecasts and other urgent safety-related messages - maritime safety information (MSI) - to ships.
+        NBDP_TELEGRAPHY_NARROW_BAND_DIRECT_PRINTING_TELEGRAPHY = "NBDP Telegraphy (Narrow Band Direct Printing Telegraphy)" # Narrow Band Direct Printing Telegraphy. A communications system consisting of teletypewriters connected to a telephonic network to send and receive wireless signals.
+        FACSIMILE = "facsimile" # A method or device for transmitting documents, drawings, photographs, or the like, by means of radio or telephone for exact reproduction elsewhere.
+        NAVIP = "NAVIP" # A Russian system transmitting navigational information, send by radio and containing information relevant to coastal waters of foreign countries and high seas.
+        LOW_FREQUENCY_LF_DIGITAL_TRAFFIC = "Low Frequency (LF) digital traffic" # Frequency in a frequency range between 30 and 300 kHz used for digital traffic
+        MEDIUM_FREQUENCY_MF_DIGITAL_TRAFFIC = "Medium Frequency (MF) digital traffic" # Frequency in a frequency range between 300 and 3000kHz used for digital traffic
+        HIGH_FREQUENCY_HF_DIGITAL_TRAFFIC = "High Frequency (HF) digital traffic" # Frequency in a frequency range between 3 and 30 MHz used for digital traffic
+        VERY_HIGH_FREQUENCY_VHF_DIGITAL_TRAFFIC = "Very High Frequency (VHF) digital traffic" # Frequency in a frequency range between 30 and 300 MHz used for digital traffic
+        LOW_FREQUENCY_LF_TELEGRAPH_TRAFFIC = "Low Frequency (LF) telegraph traffic" # Frequency in a frequency range between 30 and 300 kHz used for telegraph traffic
+        MEDIUM_FREQUENCY_MF_TELEGRAPH_TRAFFIC = "Medium Frequency (MF) telegraph traffic" # Frequency in a frequency range between 300 and 3 000kHz used for telegraph traffic
+        HIGH_FREQUENCY_HF_TELEGRAPH_TRAFFIC = "High Frequency (HF) telegraph traffic" # Frequency in a frequency range between 3 and 30 MHz used for telegraph traffic
+        MEDIUM_FREQUENCY_MF_DIGITAL_SELECTIVE_CALL_TRAFFIC = "Medium Frequency (MF) Digital Selective Call traffic" # Frequency in a frequency range between 300 and 3000kHz used for Digital Selective Call traffic
+        HIGH_FREQUENCY_HF_DIGITAL_SELECTIVE_CALL_TRAFFIC = "High Frequency (HF) Digital Selective Call traffic" # Frequency in a frequency range between 3 and 30 MHz used for Digital Selective Call traffic
+        VERY_HIGH_FREQUENCY_VHF_DIGITAL_SELECTIVE_CALL_TRAFFIC = "Very High Frequency (VHF) Digital Selective Call traffic" # Frequency in a frequency range between 30 and 300 MHz used for Digital Selective Call traffic
+        # fmt: on
+
+    contact_details = models.ForeignKey(
+        ContactDetails, on_delete=models.CASCADE, related_name="radio_communications"
+    )
+
+    category_of_comm_pref = models.CharField(
+        max_length=255,
+        choices=CategoryOfCommPref.choices,
+        blank=True,
+        null=True,
+        # No description in XSD
+    )
+
+    category_of_maritime_broadcast = ChoiceArrayField(
+        base_field=models.CharField(
+            max_length=255,
+            choices=CategoryOfMaritimeBroadcast.choices,
+        ),
+        default=list,
+        blank=True,
+        help_text="Classification of maritime broadcast based on the nature of information conveyed.",
+    )
+
+    category_of_radio_methods = ChoiceArrayField(
+        base_field=models.CharField(
+            max_length=255,
+            choices=CategoryOfRadioMethods.choices,
+        ),
+        default=list,
+        blank=True,
+        help_text="Categories of radiocommunications based on frequency band and radio traffic method.",
+    )
+
+    communication_channel = ArrayField(
+        models.CharField(max_length=255),
+        default=list,
+        blank=True,
+        help_text="A channel number assigned to a specific radio frequency, frequencies or frequency band.<br/>"
+        "ℹ️ Write comma separated values to define multiple.",
+    )
+
+    contact_instructions = models.TextField(
+        blank=True,
+        null=True,
+        help_text="Supplemental instructions on how or when to contact the individual, organisation, or service",
+    )
+
+    # FIXME: complex attribute inside a complex attribute
+    frequency_pair = ""
+
+    # FIXME: What is the unit ? dB ? A description for this field would be great
+    signal_frequency = ArrayField(
+        models.IntegerField(),
+        default=list,
+        blank=True,
+        # No description in XSD
+    )
+
+    # FIXME : This attribute doesn't appear in UML/PDF.
+    # FIXME : What is CATMAB ? category_of_maritime_broadcast ?
+    transmission_content = models.CharField(
+        max_length=255,
+        blank=True,
+        null=True,
+        help_text="Content of transmission. Remarks: Not to be used if CATMAB is populated",
+    )
+
+    # FIXME: complex attribute inside a complex attribute
+    time_intervals_by_day_of_week = ""
+
+
+class TimeIntervalsByDayOfWeek(s100.models.ComplexAttributeType):
+    """Time intervals by days of the week.
+    The sub-attribute dayOfWeekIsRanges indicates whether an instance of this attribute encodes a range of days or discrete days. The days or day-range(s) are encoded in sub-attribute dayOfWeek. Multiple ranges are allowed but mixing range with discrete days(s) is not allowed (encode another instance of this attribute instead).
+    An indeterminate range may be indicated with a null value at the appropriate position in the sequence.
+    Examples:
+    - To code the range “Monday through Friday” use the sequence: dayOfWeek=1, dayOfWeek=5 and set dayOfWeekIsRanges=TRUE.
+    - To encode the days Monday, Wednesday, Friday, use the sequence dayOfWeek=1, dayOfWeek=3, dayOfWeek=5 and set dayOfWeekIsRanges=FALSE.
+    - The sequence dayOfWeek=1, dayOfWeek=3, dayOfWeek=5  to indicate Mon-Wed and Thursday is not allowed. Encode the Mon-Wed and Thursday schedules in different instances of this complex attribute.
+    Product specifications may need to allow this attribute to be repeated in order to allow encoding of schedules which vary for different days of the week.
+    """
+
+    class DayOfWeek(models.TextChoices):
+        MONDAY = "Monday"
+        TUESDAY = "Tuesday"
+        WEDNESDAY = "Wednesday"
+        THURSDAY = "Thursday"
+        FRIDAY = "Friday"
+        SATURDAY = "Saturday"
+        SUNDAY = "Sunday"
+
+    # FIXME: "max_occurs": 7
+    day_of_week = ChoiceArrayField(
+        base_field=models.CharField(
+            max_length=255,
+            choices=DayOfWeek.choices,
+        ),
+        default=list,
+        blank=True,
+        help_text="Encodes either range(s) of days or discrete days.",
+    )
+
+    day_of_week_is_range = models.BooleanField(
+        choices=BOOLEAN_CHOICES,
+        null=True,
+        blank=True,
+        help_text="Indicates whether the values in dayOfWeek indicate a range of days (true) or discrete days (false).",
+    )
+
+    # FIXME : Why a list ? Format = YYYYMMDDThhmmss ?
+    time_of_day_start = ArrayField(
+        models.DateTimeField(),
+        default=list,
+        blank=True,
+        help_text="Starting time of day, possibly for a period within the day. Distinction: Time start (TIMSTA) (S-101) which has a format YYYYMMDDThhmmss (mandatory) in the baseline S-101 DCEG as of October 2015.",
+    )
+
+    # FIXME : Why a list ? Format = YYYYMMDDThhmmss ?
+    time_of_day_end = ArrayField(
+        models.DateTimeField(),
+        default=list,
+        blank=True,
+        help_text="Ending time of day, possibly for a period within the day. Distinction: Time end (TIMEND) (S-101) which has a format YYYYMMDDThhmmss (mandatory) in the baseline S-101 DCEG as of October 2015.",
     )
