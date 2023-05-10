@@ -247,6 +247,38 @@ class CategoryOfCommPref(models.TextChoices):
     # fmt: on
 
 
+class FrequencyPair(s100.models.GenericComplexAttributeType):
+    """
+    A pair of frequencies for transmitting and receiving radio signals.
+    The shore station transmits and receives on the frequencies indicated
+    """
+
+    # FIXME : Format Validator : 6 digits mandatory for an Integer. CustomField with a format for the output, or force to string ?
+    # https://docs.djangoproject.com/en/4.2/ref/models/fields/#django.db.models.Field.from_db_value
+    frequency_shore_station_transmits = ArrayField(
+        models.PositiveIntegerField(),
+        default=list,
+        blank=True,
+        help_text="The shore station transmitter frequency expressed in kHz to one decimal place. Units: kHZ, Resolution: 0.1, Format: XXXXXX Examples: 4379.1 kHz becomes 043791; 13162.8 kHz becomes 131628",
+    )
+
+    # FIXME : Format Validator : 6 digits mandatory for an Integer. CustomField with a format for the output ?
+    # https://docs.djangoproject.com/en/4.2/ref/models/fields/#django.db.models.Field.from_db_value
+    frequency_shore_station_receives = ArrayField(
+        models.PositiveIntegerField(),
+        default=list,
+        blank=True,
+        help_text="The shore station receiver frequency expressed in kHz to one decimal place. Units: kHz, Resolution: 0.1, Format: XXXXXX Examples: 4379.1 kHz becomes 043791; 13162.8 kHz becomes 131628",
+    )
+    # FIXME : Why an array ? This is already a TextField. And the parent class has already the exact same attribute...
+    contact_instructions = ArrayField(
+        models.TextField(),
+        default=list,
+        blank=True,
+        # No description in XSD
+    )
+
+
 # PDF page 26
 class ContactDetails(s100.models.InformationType):
     """
@@ -255,16 +287,15 @@ class ContactDetails(s100.models.InformationType):
     """
 
     """
-    :ivar online_resource: Information about online sources from which a resource or data can be obtained (ISO 19115, adapted)
-    :ivar telecommunications: information for contact by means of a
-        telecommunications service. Distinctions: emailAddress,
-        internetAddress, callName, callSign, COMCHA
-    :ivar radiocommunications: When bound to ContactDetails, only the
-        listed sub-attributes may be used: - communicationChannel -
-        contactinstructions - frequencypair -
-        categoryOfChannelOrFrequencyPreference -
-        timeIntervalsByDayOfWeek
-    :ivar the_authority:
+    FIXME :
+    ' radiocommunications: When bound to ContactDetails, only the listed sub-attributes may be used:
+    '    - communicationChannel
+    '    - contactinstructions
+    '    - frequencypair
+    '    - categoryOfChannelOrFrequencyPreference
+    '    - timeIntervalsByDayOfWeek'''
+    1/ In S127, radiocommunications is always bounded to ContactDetails.
+    2/ What is categoryOfChannelOrFrequencyPreference ? Is it categoryOfCommPreference ?
     """
 
     call_name = models.CharField(
@@ -302,6 +333,9 @@ class ContactDetails(s100.models.InformationType):
         null=True,
         help_text="Supplemental instructions on how or when to contact the individual, organisation, or service",
     )
+
+    # FIXME: complex attribute used by multiple classes
+    frequency_pair = GenericRelation(FrequencyPair)
 
     information = GenericRelation(s100.models.Information)
 
@@ -363,41 +397,6 @@ class ContactAddress(s100.models.ComplexAttributeType):
     )
 
 
-class FrequencyPair(s100.models.ComplexAttributeType):
-    """
-    A pair of frequencies for transmitting and receiving radio signals.
-    The shore station transmits and receives on the frequencies indicated
-    """
-
-    contact_details = models.ForeignKey(
-        ContactDetails, on_delete=models.CASCADE, related_name="frequency_pairs"
-    )
-    # FIXME : Format Validator : 6 digits mandatory for an Integer. CustomField with a format for the output, or force to string ?
-    # https://docs.djangoproject.com/en/4.2/ref/models/fields/#django.db.models.Field.from_db_value
-    frequency_shore_station_transmits = ArrayField(
-        models.PositiveIntegerField(),
-        default=list,
-        blank=True,
-        help_text="The shore station transmitter frequency expressed in kHz to one decimal place. Units: kHZ, Resolution: 0.1, Format: XXXXXX Examples: 4379.1 kHz becomes 043791; 13162.8 kHz becomes 131628",
-    )
-    # FIXME : Format Validator : 6 digits mandatory for an Integer. CustomField with a format for the output ?
-    # https://docs.djangoproject.com/en/4.2/ref/models/fields/#django.db.models.Field.from_db_value
-    frequency_shore_station_receives = ArrayField(
-        models.PositiveIntegerField(),
-        default=list,
-        blank=True,
-        help_text="The shore station receiver frequency expressed in kHz to one decimal place. Units: kHz, Resolution: 0.1, Format: XXXXXX Examples: 4379.1 kHz becomes 043791; 13162.8 kHz becomes 131628",
-    )
-    # FIXME : Why an array ? This is already a TextField. And the parent class has already the exact same attribute...
-    contact_instructions = ArrayField(
-        models.TextField(),
-        default=list,
-        blank=True,
-        # No description in XSD
-    )
-
-
-# FIXME : do we put this class in shared ?
 class OnlineResource(s100.models.ComplexAttributeType):
     """
     Information about online sources from which a resource or data can be
@@ -419,6 +418,7 @@ class OnlineResource(s100.models.ComplexAttributeType):
         FILE_ACCESS = "file access" # Online file access provided.
         # fmt: on
 
+    # FIXME : Maybe OnlineResource must be a GenericComplexAttribute. OnlineResource is a complexAttribute for ContactDetails and TextContent
     contact_details = models.ForeignKey(
         ContactDetails, on_delete=models.CASCADE, related_name="online_resources"
     )
@@ -468,6 +468,61 @@ class OnlineResource(s100.models.ComplexAttributeType):
         blank=True,
         null=True,
         help_text="Request used to access the resource. Structure and content depend on the protocol and standard used by the online resource, such as Web Feature Service standard. (ISO 19115, adapted)",
+    )
+
+
+class TimeIntervalsByDayOfWeek(s100.models.GenericComplexAttributeType):
+    """Time intervals by days of the week.
+    The sub-attribute dayOfWeekIsRanges indicates whether an instance of this attribute encodes a range of days or discrete days. The days or day-range(s) are encoded in sub-attribute dayOfWeek. Multiple ranges are allowed but mixing range with discrete days(s) is not allowed (encode another instance of this attribute instead).
+    An indeterminate range may be indicated with a null value at the appropriate position in the sequence.
+    Examples:
+    - To code the range “Monday through Friday” use the sequence: dayOfWeek=1, dayOfWeek=5 and set dayOfWeekIsRanges=TRUE.
+    - To encode the days Monday, Wednesday, Friday, use the sequence dayOfWeek=1, dayOfWeek=3, dayOfWeek=5 and set dayOfWeekIsRanges=FALSE.
+    - The sequence dayOfWeek=1, dayOfWeek=3, dayOfWeek=5  to indicate Mon-Wed and Thursday is not allowed. Encode the Mon-Wed and Thursday schedules in different instances of this complex attribute.
+    Product specifications may need to allow this attribute to be repeated in order to allow encoding of schedules which vary for different days of the week.
+    """
+
+    class DayOfWeek(models.TextChoices):
+        MONDAY = "Monday"
+        TUESDAY = "Tuesday"
+        WEDNESDAY = "Wednesday"
+        THURSDAY = "Thursday"
+        FRIDAY = "Friday"
+        SATURDAY = "Saturday"
+        SUNDAY = "Sunday"
+
+    # FIXME: "max_occurs": 7
+    day_of_week = ChoiceArrayField(
+        base_field=models.CharField(
+            max_length=255,
+            choices=DayOfWeek.choices,
+        ),
+        default=list,
+        blank=True,
+        help_text="Encodes either range(s) of days or discrete days.",
+    )
+
+    day_of_week_is_range = models.BooleanField(
+        choices=BOOLEAN_CHOICES,
+        null=True,
+        blank=True,
+        help_text="Indicates whether the values in dayOfWeek indicate a range of days (true) or discrete days (false).",
+    )
+
+    # FIXME : Why a list ? Format = YYYYMMDDThhmmss ?
+    time_of_day_start = ArrayField(
+        models.DateTimeField(),
+        default=list,
+        blank=True,
+        help_text="Starting time of day, possibly for a period within the day. Distinction: Time start (TIMSTA) (S-101) which has a format YYYYMMDDThhmmss (mandatory) in the baseline S-101 DCEG as of October 2015.",
+    )
+
+    # FIXME : Why a list ? Format = YYYYMMDDThhmmss ?
+    time_of_day_end = ArrayField(
+        models.DateTimeField(),
+        default=list,
+        blank=True,
+        help_text="Ending time of day, possibly for a period within the day. Distinction: Time end (TIMEND) (S-101) which has a format YYYYMMDDThhmmss (mandatory) in the baseline S-101 DCEG as of October 2015.",
     )
 
 
@@ -525,7 +580,7 @@ class Radiocommunications(s100.models.ComplexAttributeType):
         # fmt: on
 
     contact_details = models.ForeignKey(
-        ContactDetails, on_delete=models.CASCADE, related_name="radio_communications"
+        ContactDetails, on_delete=models.CASCADE, related_name="radiocommunications"
     )
 
     category_of_comm_pref = models.CharField(
@@ -570,10 +625,10 @@ class Radiocommunications(s100.models.ComplexAttributeType):
         help_text="Supplemental instructions on how or when to contact the individual, organisation, or service",
     )
 
-    # FIXME: complex attribute inside a complex attribute
-    frequency_pair = ""
+    # FIXME: complex attribute used by multiple classes
+    frequency_pair = GenericRelation(FrequencyPair)
 
-    # FIXME: What is the unit ? dB ? A description for this field would be great
+    # https://github.com/betagouv/SPPNautInterface/issues/240
     signal_frequency = ArrayField(
         models.IntegerField(),
         default=list,
@@ -581,8 +636,7 @@ class Radiocommunications(s100.models.ComplexAttributeType):
         # No description in XSD
     )
 
-    # FIXME : This attribute doesn't appear in UML/PDF.
-    # FIXME : What is CATMAB ? category_of_maritime_broadcast ?
+    # https://github.com/betagouv/SPPNautInterface/issues/241
     transmission_content = models.CharField(
         max_length=255,
         blank=True,
@@ -590,60 +644,98 @@ class Radiocommunications(s100.models.ComplexAttributeType):
         help_text="Content of transmission. Remarks: Not to be used if CATMAB is populated",
     )
 
-    # FIXME: complex attribute inside a complex attribute
-    time_intervals_by_day_of_week = ""
+    # FIXME: complex attribute used by multiple classes
+    time_intervals_by_day_of_week = GenericRelation(TimeIntervalsByDayOfWeek)
 
 
-class TimeIntervalsByDayOfWeek(s100.models.ComplexAttributeType):
-    """Time intervals by days of the week.
-    The sub-attribute dayOfWeekIsRanges indicates whether an instance of this attribute encodes a range of days or discrete days. The days or day-range(s) are encoded in sub-attribute dayOfWeek. Multiple ranges are allowed but mixing range with discrete days(s) is not allowed (encode another instance of this attribute instead).
-    An indeterminate range may be indicated with a null value at the appropriate position in the sequence.
-    Examples:
-    - To code the range “Monday through Friday” use the sequence: dayOfWeek=1, dayOfWeek=5 and set dayOfWeekIsRanges=TRUE.
-    - To encode the days Monday, Wednesday, Friday, use the sequence dayOfWeek=1, dayOfWeek=3, dayOfWeek=5 and set dayOfWeekIsRanges=FALSE.
-    - The sequence dayOfWeek=1, dayOfWeek=3, dayOfWeek=5  to indicate Mon-Wed and Thursday is not allowed. Encode the Mon-Wed and Thursday schedules in different instances of this complex attribute.
-    Product specifications may need to allow this attribute to be repeated in order to allow encoding of schedules which vary for different days of the week.
+class Telecommunications(s100.models.ComplexAttributeType):
+    """
+    A means or channel of communicating at a distance by electrical or
+    electromagnetic means such as telegraphy, telephony, or broadcasting.
     """
 
-    class DayOfWeek(models.TextChoices):
-        MONDAY = "Monday"
-        TUESDAY = "Tuesday"
-        WEDNESDAY = "Wednesday"
-        THURSDAY = "Thursday"
-        FRIDAY = "Friday"
-        SATURDAY = "Saturday"
-        SUNDAY = "Sunday"
+    class TelecommunicationService(s100.models.CodeList):
+        # fmt: off
+        VOICE = "voice" # The transfer or exchange of information by using sounds that are being made by mouth and throat when speaking
+        FACSIMILE = "facsimile" # a system of transmitting and reproducing graphic matter (as printing or still pictures) by means of signals sent over telephone lines
+        SMS = "sms" # Short Message Service, a form of text messaging communication on phones and mobile phones
+        DATA = "data" # facts or information used usually to calculate, analyze, or plan something
+        STREAMED_DATA = "streamedData" # Streamed data is data that that is constantly received by and presented to an end-user while being delivered by a provider.
+        TELEX = "telex" # a system of communication in which messages are sent over long distances by using a telephone system and are printed by using a special machine (called a teletypewriter)
+        TELEGRAPH = "telegraph" # an apparatus, system, or process for communication at a distance by electric transmission over wire
+        EMAIL = "email" # Messages and other data exchanged between individuals using computers in a network.
+        # fmt: on
 
-    # FIXME: "max_occurs": 7
-    day_of_week = ChoiceArrayField(
-        base_field=models.CharField(
-            max_length=255,
-            choices=DayOfWeek.choices,
-        ),
-        default=list,
-        blank=True,
-        help_text="Encodes either range(s) of days or discrete days.",
+    contact_details = models.ForeignKey(
+        ContactDetails, on_delete=models.CASCADE, related_name="telecommunications"
     )
 
-    day_of_week_is_range = models.BooleanField(
-        choices=BOOLEAN_CHOICES,
+    category_of_comm_pref = models.CharField(
+        max_length=255,
+        choices=CategoryOfCommPref.choices,
+        blank=True,
         null=True,
-        blank=True,
-        help_text="Indicates whether the values in dayOfWeek indicate a range of days (true) or discrete days (false).",
+        # No description in XSD
     )
 
-    # FIXME : Why a list ? Format = YYYYMMDDThhmmss ?
-    time_of_day_start = ArrayField(
-        models.DateTimeField(),
-        default=list,
+    contact_instructions = models.TextField(
         blank=True,
-        help_text="Starting time of day, possibly for a period within the day. Distinction: Time start (TIMSTA) (S-101) which has a format YYYYMMDDThhmmss (mandatory) in the baseline S-101 DCEG as of October 2015.",
+        null=True,
+        help_text="Instructions on how and when to contact an individual or organisation",
     )
 
-    # FIXME : Why a list ? Format = YYYYMMDDThhmmss ?
-    time_of_day_end = ArrayField(
-        models.DateTimeField(),
-        default=list,
+    telcom_carrier = models.CharField(
+        max_length=255,
         blank=True,
-        help_text="Ending time of day, possibly for a period within the day. Distinction: Time end (TIMEND) (S-101) which has a format YYYYMMDDThhmmss (mandatory) in the baseline S-101 DCEG as of October 2015.",
+        null=True,
+        help_text="The name of provider or type of carrier for a telecommunications service",
     )
+
+    telecommunication_identifier = models.CharField(
+        max_length=255,
+        help_text="Identifier used for contact by means of a telecommunications service, such as a telephone number",
+    )
+
+    telecommunication_service = models.CharField(
+        max_length=255,
+        choices=TelecommunicationService.choices,
+        blank=True,
+        null=True,
+        help_text="Type of telecommunications service",
+    )
+
+
+class ScheduleByDayOfWeek(s100.models.ComplexAttributeType):
+    """
+    Describes the nature and timings of a daily schedule by days of the week.
+    """
+
+    class CategoryOfSchedule(s100.models.CodeList):
+        """
+        :cvar NORMAL_OPERATION: The service, office, is open, fully manned,
+            and operating normally, or the area is accessible as usual.
+        :cvar CLOSURE: The service, office, or area is closed.
+        :cvar UNMANNED_OPERATION: The service is available but not manned.
+        """
+
+        NORMAL_OPERATION = "normal operation"
+        CLOSURE = "closure"
+        UNMANNED_OPERATION = "unmanned operation"
+
+    # FIXME : Maybe ScheduleByDayOfWeek must be a GenericComplexAttribute. ScheduleByDayOfWeek is a complexAttribute for Telecommunications and ServiceHours
+    telecommunications = models.ForeignKey(
+        Telecommunications,
+        on_delete=models.CASCADE,
+        related_name="schedulesbydayofweek",
+    )
+
+    category_of_schedule = models.CharField(
+        max_length=255,
+        choices=CategoryOfSchedule.choices,
+        blank=True,
+        null=True,
+        help_text="Describes the type of schedule, e.g., opening, closure, etc.",
+    )
+
+    # FIXME: complex attribute used by multiple classes
+    time_intervals_by_day_of_week = GenericRelation(TimeIntervalsByDayOfWeek)
