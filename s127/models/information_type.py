@@ -279,6 +279,75 @@ class FrequencyPair(s100.models.GenericComplexAttributeType):
     )
 
 
+class OnlineResource(s100.models.GenericComplexAttributeType):
+    """
+    Information about online sources from which a resource or data can be
+    obtained (ISO 19115, adapted).
+    """
+
+    class OnlineFunction(s100.models.CodeList):
+        # fmt: off
+        DOWNLOAD = "download" # Online instructions for transferring data from one storage device or system to another.
+        INFORMATION = "information" # Online information about the resource.
+        OFFLINE_ACCESS = "offline access" # Online instructions for requesting the resource from the provider.
+        ORDER = "order" # Online order process for obtaining the resource.
+        SEARCH = "search" # Online search interface for seeking out information about the resource.
+        COMPLETE_METADATA = "complete metadata" # Complete metadata provided.
+        BROWSE_GRAPHIC = "browse graphic" # Browse graphic provided.
+        UPLOAD = "upload" # Resource upload capability provided.
+        EMAIL_SERVICE = "email service" # Online email service provided.
+        BROWSING = "browsing" # Online browsing provided.
+        FILE_ACCESS = "file access" # Online file access provided.
+        # fmt: on
+
+    linkage = models.URLField(
+        help_text="Location (address) for on-line access using a URL/URI address or similar addressing scheme. (Adapted from ISO 19115:2014.)",
+    )
+
+    protocol = models.CharField(
+        max_length=255,
+        blank=True,
+        null=True,
+        help_text="Connection protocol to be used. Example: ftp, http get KVP, http POST, etc. (ISO 19115)",
+    )
+
+    application_profile = models.CharField(
+        max_length=255,
+        blank=True,
+        null=True,
+        help_text="Name of an application profile that can be used with the online resource (ISO 19115)",
+    )
+
+    name_of_resource = models.CharField(
+        max_length=255,
+        blank=True,
+        null=True,
+        help_text="Name of the online resource (ISO 19115, adapted)",
+    )
+
+    online_resource_description = models.CharField(
+        max_length=255,
+        blank=True,
+        null=True,
+        help_text="Detailed text description of what the online resource is/does (ISO 19115)",
+    )
+
+    online_function = models.CharField(
+        max_length=255,
+        choices=OnlineFunction.choices,
+        blank=True,
+        null=True,
+        help_text="Code for function performed by the online resource (ISO 19115)",
+    )
+
+    protocol_request = models.CharField(
+        max_length=255,
+        blank=True,
+        null=True,
+        help_text="Request used to access the resource. Structure and content depend on the protocol and standard used by the online resource, such as Web Feature Service standard. (ISO 19115, adapted)",
+    )
+
+
 # PDF page 26
 class ContactDetails(s100.models.InformationType):
     """
@@ -353,6 +422,9 @@ class ContactDetails(s100.models.InformationType):
         help_text="The Maritime Mobile Service Identity (MMSI) Code is formed of a series of nine digits which are transmitted over the radio path in order to uniquely identify ship stations, ship earth stations, coast stations, coast earth stations, and group calls. These identities are formed in such a way that the identity or part thereof can be used by telephone and telex subscribers connected to the general telecommunications network principally to call ships automatically.",
     )
 
+    # FIXME: complex attribute used by multiple classes
+    online_resource = GenericRelation(OnlineResource)
+
 
 class ContactAddress(s100.models.ComplexAttributeType):
     """
@@ -394,80 +466,6 @@ class ContactAddress(s100.models.ComplexAttributeType):
         blank=True,
         null=True,
         help_text="Known in various countries as a postcode, or ZIP code, the postal code is a series of letters and/or digits that identifies each postal delivery area.",
-    )
-
-
-class OnlineResource(s100.models.ComplexAttributeType):
-    """
-    Information about online sources from which a resource or data can be
-    obtained (ISO 19115, adapted).
-    """
-
-    class OnlineFunction(s100.models.CodeList):
-        # fmt: off
-        DOWNLOAD = "download" # Online instructions for transferring data from one storage device or system to another.
-        INFORMATION = "information" # Online information about the resource.
-        OFFLINE_ACCESS = "offline access" # Online instructions for requesting the resource from the provider.
-        ORDER = "order" # Online order process for obtaining the resource.
-        SEARCH = "search" # Online search interface for seeking out information about the resource.
-        COMPLETE_METADATA = "complete metadata" # Complete metadata provided.
-        BROWSE_GRAPHIC = "browse graphic" # Browse graphic provided.
-        UPLOAD = "upload" # Resource upload capability provided.
-        EMAIL_SERVICE = "email service" # Online email service provided.
-        BROWSING = "browsing" # Online browsing provided.
-        FILE_ACCESS = "file access" # Online file access provided.
-        # fmt: on
-
-    # FIXME : Maybe OnlineResource must be a GenericComplexAttribute. OnlineResource is a complexAttribute for ContactDetails and TextContent
-    contact_details = models.ForeignKey(
-        ContactDetails, on_delete=models.CASCADE, related_name="online_resources"
-    )
-
-    linkage = models.URLField(
-        help_text="Location (address) for on-line access using a URL/URI address or similar addressing scheme. (Adapted from ISO 19115:2014.)",
-    )
-
-    protocol = models.CharField(
-        max_length=255,
-        blank=True,
-        null=True,
-        help_text="Connection protocol to be used. Example: ftp, http get KVP, http POST, etc. (ISO 19115)",
-    )
-
-    application_profile = models.CharField(
-        max_length=255,
-        blank=True,
-        null=True,
-        help_text="Name of an application profile that can be used with the online resource (ISO 19115)",
-    )
-
-    name_of_resource = models.CharField(
-        max_length=255,
-        blank=True,
-        null=True,
-        help_text="Name of the online resource (ISO 19115, adapted)",
-    )
-
-    online_resource_description = models.CharField(
-        max_length=255,
-        blank=True,
-        null=True,
-        help_text="Detailed text description of what the online resource is/does (ISO 19115)",
-    )
-
-    online_function = models.CharField(
-        max_length=255,
-        choices=OnlineFunction.choices,
-        blank=True,
-        null=True,
-        help_text="Code for function performed by the online resource (ISO 19115)",
-    )
-
-    protocol_request = models.CharField(
-        max_length=255,
-        blank=True,
-        null=True,
-        help_text="Request used to access the resource. Structure and content depend on the protocol and standard used by the online resource, such as Web Feature Service standard. (ISO 19115, adapted)",
     )
 
 
@@ -648,6 +646,35 @@ class Radiocommunications(s100.models.ComplexAttributeType):
     time_intervals_by_day_of_week = GenericRelation(TimeIntervalsByDayOfWeek)
 
 
+class ScheduleByDayOfWeek(s100.models.GenericComplexAttributeType):
+    """
+    Describes the nature and timings of a daily schedule by days of the week.
+    """
+
+    class CategoryOfSchedule(s100.models.CodeList):
+        """
+        :cvar NORMAL_OPERATION: The service, office, is open, fully manned,
+            and operating normally, or the area is accessible as usual.
+        :cvar CLOSURE: The service, office, or area is closed.
+        :cvar UNMANNED_OPERATION: The service is available but not manned.
+        """
+
+        NORMAL_OPERATION = "normal operation"
+        CLOSURE = "closure"
+        UNMANNED_OPERATION = "unmanned operation"
+
+    category_of_schedule = models.CharField(
+        max_length=255,
+        choices=CategoryOfSchedule.choices,
+        blank=True,
+        null=True,
+        help_text="Describes the type of schedule, e.g., opening, closure, etc.",
+    )
+
+    # FIXME: complex attribute used by multiple classes
+    time_intervals_by_day_of_week = GenericRelation(TimeIntervalsByDayOfWeek)
+
+
 class Telecommunications(s100.models.ComplexAttributeType):
     """
     A means or channel of communicating at a distance by electrical or
@@ -704,38 +731,5 @@ class Telecommunications(s100.models.ComplexAttributeType):
         help_text="Type of telecommunications service",
     )
 
-
-class ScheduleByDayOfWeek(s100.models.ComplexAttributeType):
-    """
-    Describes the nature and timings of a daily schedule by days of the week.
-    """
-
-    class CategoryOfSchedule(s100.models.CodeList):
-        """
-        :cvar NORMAL_OPERATION: The service, office, is open, fully manned,
-            and operating normally, or the area is accessible as usual.
-        :cvar CLOSURE: The service, office, or area is closed.
-        :cvar UNMANNED_OPERATION: The service is available but not manned.
-        """
-
-        NORMAL_OPERATION = "normal operation"
-        CLOSURE = "closure"
-        UNMANNED_OPERATION = "unmanned operation"
-
-    # FIXME : Maybe ScheduleByDayOfWeek must be a GenericComplexAttribute. ScheduleByDayOfWeek is a complexAttribute for Telecommunications and ServiceHours
-    telecommunications = models.ForeignKey(
-        Telecommunications,
-        on_delete=models.CASCADE,
-        related_name="schedulesbydayofweek",
-    )
-
-    category_of_schedule = models.CharField(
-        max_length=255,
-        choices=CategoryOfSchedule.choices,
-        blank=True,
-        null=True,
-        help_text="Describes the type of schedule, e.g., opening, closure, etc.",
-    )
-
     # FIXME: complex attribute used by multiple classes
-    time_intervals_by_day_of_week = GenericRelation(TimeIntervalsByDayOfWeek)
+    schedule_by_day_of_week = GenericRelation(ScheduleByDayOfWeek)
