@@ -254,17 +254,6 @@ class ContactDetails(s100.models.InformationType):
     telephone, telex and radio systems.
     """
 
-    """
-    FIXME : radiocommunications: When bound to ContactDetails, only the listed sub-attributes may be used:
-    '    - communicationChannel
-    '    - contactinstructions
-    '    - frequencypair
-    '    - categoryOfChannelOrFrequencyPreference
-    '    - timeIntervalsByDayOfWeek
-    1/ In S127, radiocommunications is always bounded to ContactDetails.
-    2/ What is categoryOfChannelOrFrequencyPreference ? Is it categoryOfCommPreference ?
-    """
-
     call_name = models.CharField(
         max_length=255,
         blank=True,
@@ -311,7 +300,6 @@ class ContactDetails(s100.models.InformationType):
         # No description in XSD
     )
 
-    # FIXME : Series of 9 digits ? Do we validate that ?
     mmsi_code = models.CharField(
         max_length=255,
         blank=True,
@@ -369,6 +357,9 @@ class ContactAddress(s100.models.ComplexAttributeType):
         help_text="The name of a nation. (Adapted from The American Heritage Dictionaries)",
     )
 
+    class Meta:
+        verbose_name_plural = "Contact Addresses"
+
 
 class Telecommunications(s100.models.ComplexAttributeType):
     """
@@ -418,10 +409,15 @@ class Telecommunications(s100.models.ComplexAttributeType):
         help_text="Identifier used for contact by means of a telecommunications service, such as a telephone number",
     )
 
-    telecommunication_service = models.CharField(
-        max_length=255,
-        choices=TelecommunicationService.choices,
+    telecommunication_service = ChoiceArrayField(
+        base_field=models.CharField(
+            max_length=255,
+            choices=TelecommunicationService.choices,
+        ),
+        default=list,
         blank=True,
-        null=True,
         help_text="Type of telecommunications service",
     )
+
+    class Meta:
+        verbose_name_plural = "Telecommunications"
