@@ -22,16 +22,16 @@ class TelecommunicationsInline(admin.StackedInline):
     extra = 1
 
 
-@admin.register(models.Applicability)
-class ApplicabilityAdmin(admin.ModelAdmin):
-    search_fields = ["id"]
-    inlines = [InformationInline, VesselsMeasurementsInline]
-
-
 @admin.register(models.ContactDetails)
 class ContactDetailsAdmin(admin.ModelAdmin):
     search_fields = ["id"]
     inlines = [TelecommunicationsInline, ContactAddressInline, InformationInline]
+
+
+@admin.register(models.Applicability)
+class ApplicabilityAdmin(admin.ModelAdmin):
+    search_fields = ["id"]
+    inlines = [InformationInline, VesselsMeasurementsInline]
 
 
 class SrvContactInline(GenericTabularInline):
@@ -40,14 +40,8 @@ class SrvContactInline(GenericTabularInline):
     model = models.SrvContact
 
     min_num = 0
-    extra = 1
+    extra = 0
     autocomplete_fields = ["contact_details"]
-
-
-class OrganisationContactAreaAdmin(admin.ModelAdmin):
-    inlines = [
-        SrvContactInline,
-    ]
 
 
 class FeatureTypePermissionTypeInline(GenericTabularInline):
@@ -68,20 +62,35 @@ class FeatureTypeAdmin(admin.ModelAdmin):
     ]
 
 
+class OrganisationContactAreaAdmin(admin.ModelAdmin):
+    inlines = [
+        SrvContactInline,
+    ]
+    inlines.extend(FeatureTypeAdmin.inlines)
+
+
+class SupervisedAreaAdmin(admin.ModelAdmin):
+    inlines = []
+    inlines.extend(OrganisationContactAreaAdmin.inlines)
+
+
+class ReportableServiceAreaAdmin(admin.ModelAdmin):
+    inlines = []
+    inlines.extend(SupervisedAreaAdmin.inlines)
+
+
 @admin.register(models.PilotageDistrict)
 class PilotageDistrictAdmin(GISModelAdminWithRasterMarine, FeatureTypeAdmin):
     search_fields = ["id"]
 
 
 @admin.register(models.PilotService)
-class PilotServiceAdmin(
-    GISModelAdminWithRasterMarine, FeatureTypeAdmin, OrganisationContactAreaAdmin
-):
+class PilotServiceAdmin(GISModelAdminWithRasterMarine, OrganisationContactAreaAdmin):
     autocomplete_fields = ["pilotage_district"]
 
 
 @admin.register(models.PilotBoardingPlace)
 class PilotBoardingPlaceAdmin(
-    GISModelAdminWithRasterMarine, FeatureTypeAdmin, OrganisationContactAreaAdmin
+    GISModelAdminWithRasterMarine, OrganisationContactAreaAdmin
 ):
     pass
