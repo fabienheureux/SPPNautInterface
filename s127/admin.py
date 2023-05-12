@@ -34,6 +34,22 @@ class ContactDetailsAdmin(admin.ModelAdmin):
     inlines = [TelecommunicationsInline, ContactAddressInline, InformationInline]
 
 
+class SrvContactInline(GenericTabularInline):
+    ct_field = "feature_content_type"
+    ct_fk_field = "feature_object_id"
+    model = models.SrvContact
+
+    min_num = 0
+    extra = 1
+    autocomplete_fields = ["contact_details"]
+
+
+class OrganisationContactAreaAdmin(admin.ModelAdmin):
+    inlines = [
+        SrvContactInline,
+    ]
+
+
 class FeatureTypePermissionTypeInline(GenericTabularInline):
     ct_field = "feature_content_type"
     ct_fk_field = "feature_object_id"
@@ -58,10 +74,14 @@ class PilotageDistrictAdmin(GISModelAdminWithRasterMarine, FeatureTypeAdmin):
 
 
 @admin.register(models.PilotService)
-class PilotServiceAdmin(GISModelAdminWithRasterMarine, FeatureTypeAdmin):
+class PilotServiceAdmin(
+    GISModelAdminWithRasterMarine, FeatureTypeAdmin, OrganisationContactAreaAdmin
+):
     autocomplete_fields = ["pilotage_district"]
 
 
 @admin.register(models.PilotBoardingPlace)
-class PilotBoardingPlaceAdmin(GISModelAdminWithRasterMarine, FeatureTypeAdmin):
+class PilotBoardingPlaceAdmin(
+    GISModelAdminWithRasterMarine, FeatureTypeAdmin, OrganisationContactAreaAdmin
+):
     pass

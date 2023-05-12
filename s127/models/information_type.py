@@ -311,6 +311,16 @@ class ContactDetails(s100.models.InformationType):
         verbose_name_plural = "Contact Details"
 
 
+class SrvContact(s100.models.GenericManyToMany):
+    # ManyToMany
+    feature_content_type = models.ForeignKey(
+        ContentType, on_delete=models.CASCADE, related_name="+"
+    )
+    feature_object_id = models.BigIntegerField()
+    feature_object = GenericForeignKey("feature_content_type", "feature_object_id")
+    contact_details = models.ForeignKey(ContactDetails, on_delete=models.CASCADE)
+
+
 class ContactAddress(s100.models.ComplexAttributeType):
     """
     Direction or superscription of a letter, package, etc., specifying the name
