@@ -12,10 +12,26 @@ class VesselsMeasurementsInline(admin.StackedInline):
     extra = 0
 
 
+class ContactAddressInline(admin.StackedInline):
+    model = models.ContactAddress
+    extra = 0
+
+
+class TelecommunicationsInline(admin.StackedInline):
+    model = models.Telecommunications
+    extra = 1
+
+
 @admin.register(models.Applicability)
 class ApplicabilityAdmin(admin.ModelAdmin):
     search_fields = ["id"]
     inlines = [InformationInline, VesselsMeasurementsInline]
+
+
+@admin.register(models.ContactDetails)
+class ContactDetailsAdmin(admin.ModelAdmin):
+    search_fields = ["id"]
+    inlines = [TelecommunicationsInline, ContactAddressInline, InformationInline]
 
 
 class FeatureTypePermissionTypeInline(GenericTabularInline):
