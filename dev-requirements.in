@@ -1,0 +1,10 @@
+--constraint=requirements.txt
+
+black
+django-browser-reload
+django-debug-toolbar
+honcho
+pytest
+pytest-django
+pytest-dotenv
+requests-mock
